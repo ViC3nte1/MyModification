@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Widgets
 import Caelestia.Config
+import Caelestia.I18n
 import Caelestia.Models
 import qs.components
 import qs.components.containers
@@ -16,7 +17,7 @@ ColumnLayout {
     id: root
 
     required property var props
-    required property DrawerVisibilities visibilities
+    required property ScreenState screenState
 
     spacing: 0
 
@@ -38,7 +39,7 @@ ColumnLayout {
             StyledText {
                 Layout.alignment: Qt.AlignVCenter
                 Layout.fillWidth: true
-                text: qsTr("Recordings")
+                text: Tr.tr("Recordings")
                 font: Tokens.font.body.medium
             }
 
@@ -92,7 +93,10 @@ ColumnLayout {
                         return time;
                     const date = new Date(...matches.slice(1));
                     date.setMonth(date.getMonth() - 1); // Woe (months start from 0)
-                    return qsTr("Recording at %1").arg(Qt.formatDateTime(date, Qt.locale()));
+                    const dateStr = date.toLocaleDateString(Qt.locale(), Locale.ShortFormat);
+                    const timeStr = Tr.formatDateTime(date, Units.twelveHourClock ? "h:mm a" : "hh:mm");
+                    // TRANSLATORS: %1 = date, %2 = time
+                    return Tr.tr("Recording at %1 %2").arg(dateStr).arg(timeStr);
                 }
                 color: Colours.palette.m3onSurfaceVariant
                 elide: Text.ElideRight
@@ -102,8 +106,8 @@ ColumnLayout {
                 icon: "play_arrow"
                 type: IconButton.Text
                 onClicked: {
-                    root.visibilities.utilities = false;
-                    root.visibilities.sidebar = false;
+                    root.screenState.utilities = false;
+                    root.screenState.sidebar = false;
                     Quickshell.execDetached([...GlobalConfig.general.apps.playback, recording.modelData.path]);
                 }
             }
@@ -112,8 +116,8 @@ ColumnLayout {
                 icon: "folder"
                 type: IconButton.Text
                 onClicked: {
-                    root.visibilities.utilities = false;
-                    root.visibilities.sidebar = false;
+                    root.screenState.utilities = false;
+                    root.screenState.sidebar = false;
                     Quickshell.execDetached([...GlobalConfig.general.apps.explorer, recording.modelData.path]);
                 }
             }
@@ -218,7 +222,7 @@ ColumnLayout {
                     }
 
                     StyledText {
-                        text: qsTr("No recordings found")
+                        text: Tr.tr("No recordings found")
                         color: Colours.palette.m3outline
                     }
                 }

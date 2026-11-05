@@ -13,7 +13,7 @@ import qs.utils
 Column {
     id: root
 
-    required property DrawerVisibilities visibilities
+    required property ScreenState screenState
 
     padding: Tokens.padding.large
     rightPadding: CUtils.clamp(padding - Config.border.thickness, 0, padding)
@@ -31,11 +31,11 @@ Column {
 
         Connections {
             function onLauncherChanged(): void {
-                if (!root.visibilities.launcher)
+                if (!root.screenState.launcher)
                     logout.forceActiveFocus();
             }
 
-            target: root.visibilities
+            target: root.screenState
         }
     }
 
@@ -49,16 +49,20 @@ Column {
         KeyNavigation.down: hibernate
     }
 
-    AnimatedImage {
-        width: Tokens.sizes.session.button
-        height: Tokens.sizes.session.button
-        sourceSize.width: width * ((QsWindow.window as QsWindow)?.devicePixelRatio ?? 1)
+    Loader {
+        active: Config.paths.sessionGif.trim() !== ""
 
-        playing: visible
-        asynchronous: true
-        speed: Config.general.sessionGifSpeed
-        source: Paths.absolutePath(Config.paths.sessionGif)
-        fillMode: AnimatedImage.PreserveAspectFit
+        sourceComponent: AnimatedImage {
+            width: Tokens.sizes.session.button
+            height: Tokens.sizes.session.button
+            sourceSize.width: width * ((QsWindow.window as QsWindow)?.devicePixelRatio ?? 1)
+
+            playing: visible
+            asynchronous: true
+            speed: Config.general.sessionGifSpeed
+            source: Paths.absolutePath(Config.paths.sessionGif)
+            fillMode: AnimatedImage.PreserveAspectFit
+        }
     }
 
     SessionButton {
@@ -101,7 +105,7 @@ Column {
 
         Keys.onEnterPressed: exec()
         Keys.onReturnPressed: exec()
-        Keys.onEscapePressed: root.visibilities.session = false
+        Keys.onEscapePressed: root.screenState.session = false
         Keys.onPressed: event => {
             if (!Config.session.vimKeybinds)
                 return;

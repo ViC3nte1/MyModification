@@ -3,10 +3,9 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
-import QtQml
 import Quickshell
-import Quickshell.Hyprland
 import Caelestia.Config
+import Caelestia.I18n
 import Caelestia.Services
 import qs.components
 import qs.components.controls
@@ -21,46 +20,21 @@ Item {
     required property real absX
     required property real absY
 
+    property var settings: ({})
+
     QtObject {
         id: _cfg
 
-        property real scale: 1
-        property bool invertColors: false
-        property int alignment: 1
-        property bool autoHide: true
-        property bool bgEnabled: false
-        property bool bgBlur: true
-        property real bgOpacity: 0.7
-        property bool shadowEnabled: true
-        property real shadowOpacity: 0.7
-        property real shadowBlur: 0.4
-
-        Component.onCompleted: {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", "file://" + Quickshell.env("HOME") + "/.config/caelestia/desktop-lyrics.json", false);
-            try {
-                xhr.send();
-                if (xhr.status === 200) {
-                    var data = JSON.parse(xhr.responseText);
-                    var c = data;
-                    if (!c) return;
-                    if (c.scale) scale = c.scale;
-                    if (c.invertColors !== undefined) invertColors = c.invertColors;
-                    if (c.alignment !== undefined) alignment = c.alignment;
-                    if (c.autoHide !== undefined) autoHide = c.autoHide;
-                    if (c.background) {
-                        if (c.background.enabled !== undefined) bgEnabled = c.background.enabled;
-                        if (c.background.blur !== undefined) bgBlur = c.background.blur;
-                        if (c.background.opacity) bgOpacity = c.background.opacity;
-                    }
-                    if (c.shadow) {
-                        if (c.shadow.enabled !== undefined) shadowEnabled = c.shadow.enabled;
-                        if (c.shadow.opacity) shadowOpacity = c.shadow.opacity;
-                        if (c.shadow.blur) shadowBlur = c.shadow.blur;
-                    }
-                }
-            } catch(e) {}
-        }
+        readonly property real scale: root.settings.scale ?? 1
+        readonly property bool invertColors: root.settings.invertColors ?? false
+        readonly property int alignment: root.settings.alignment ?? 1
+        readonly property bool autoHide: root.settings.autoHide ?? true
+        readonly property bool bgEnabled: root.settings.background?.enabled ?? false
+        readonly property bool bgBlur: root.settings.background?.blur ?? true
+        readonly property real bgOpacity: root.settings.background?.opacity ?? 0.7
+        readonly property bool shadowEnabled: root.settings.shadow?.enabled ?? true
+        readonly property real shadowOpacity: root.settings.shadow?.opacity ?? 0.7
+        readonly property real shadowBlur: root.settings.shadow?.blur ?? 0.4
     }
 
     property real lyricsScale: _cfg.scale
@@ -70,18 +44,17 @@ Item {
     readonly property bool useLightSet: Colours.light ? !invertColors : invertColors
     readonly property color safePrimary: useLightSet ? Colours.palette.m3primaryContainer : Colours.palette.m3primary
     readonly property color safeSecondary: useLightSet ? Colours.palette.m3secondaryContainer : Colours.palette.m3secondary
-    readonly property color safeTertiary: useLightSet ? Colours.palette.m3tertiaryContainer : Colours.palette.m3tertiary
-    readonly property string sansFont: GlobalConfig.appearance.font.body.family || "Sans Serif"
+
     readonly property int alignment: _cfg.alignment
     readonly property bool autoHide: _cfg.autoHide
     readonly property bool allWindowsFloating: Hypr.monitorFor(screen)?.activeWorkspace?.toplevels?.values.every(t => t.lastIpcObject?.floating) ?? true
     readonly property bool shouldHide: autoHide && !allWindowsFloating
 
-    property bool hasLyrics: Lyrics.hasLyrics
+    readonly property bool hasLyrics: Lyrics.hasLyrics
     property int currentLyricIndex: -1
     readonly property bool isCurrentActive: currentLyricIndex >= 0
 
-    property var player: Players.active
+
     property string displayedLyric: ""
     property string previousLyricText: ""
     property string nextLyricText: ""
@@ -92,58 +65,33 @@ Item {
     property real targetNextY: targetCenterY + lyricContainer.height + lyricSpacing
     property real startNextY: targetNextY + nextLyricItem.height + lyricSpacing
 
-    function reloadTrack() {
+    // Match the dashboard's reactive metadata tuple. Native setTrack deduplicates
+    // identical tuples across views; this view never clears or refreshes the singleton.
+    readonly property var trackSync: {
         const p = Players.active;
-        if (p) {
+        if (p)
             Lyrics.setTrack(p.trackArtist, p.trackTitle, p.trackAlbum, p.length);
-        } else {
-            Lyrics.clearTrack();
-        }
+        return null;
     }
 
-    function forceUpdate() {
-        if (Lyrics.hasLyrics) {
-            currentLyricIndex = Lyrics.indexForTime(Players.active?.position ?? 0);
-            if (currentLyricIndex >= 0) {
-                displayedLyric = (Lyrics.lyrics[currentLyricIndex] ?? "").replace(/\u00A0/g, " ");
-                previousLyricText = currentLyricIndex > 0 ? (Lyrics.lyrics[currentLyricIndex - 1] ?? "").replace(/\u00A0/g, " ") : "";
-                nextLyricText = currentLyricIndex < Lyrics.lyrics.length - 1 ? (Lyrics.lyrics[currentLyricIndex + 1] ?? "").replace(/\u00A0/g, " ") : "";
-            } else {
-                displayedLyric = "";
-                previousLyricText = "";
-                nextLyricText = (Lyrics.lyrics[0] ?? "").replace(/\u00A0/g, " ");
-            }
-            lyricSlide.running = true;
-        } else {
-            currentLyricIndex = -1;
-            displayedLyric = "";
-            previousLyricText = "";
-            nextLyricText = "";
-        }
+    function updateLyrics(): void {
+        const available = Lyrics.hasLyrics && Players.active !== null;
+        const index = available ? Lyrics.indexForTime(Players.active.position) : -1;
+        const lines = Lyrics.lyrics;
+        const current = index >= 0 ? (lines[index] ?? "").replace(/\u00A0/g, " ") : "";
+        const previous = index > 0 ? (lines[index - 1] ?? "").replace(/\u00A0/g, " ") : "";
+        const next = available ? (lines[index + 1] ?? "").replace(/\u00A0/g, " ") : "";
+        const changed = index !== currentLyricIndex || current !== displayedLyric || previous !== previousLyricText || next !== nextLyricText;
+
+        currentLyricIndex = index;
+        displayedLyric = current;
+        previousLyricText = previous;
+        nextLyricText = next;
+        if (changed && index >= 0)
+            lyricSlide.restart();
     }
 
-    onCurrentLyricIndexChanged: {
-        if (Lyrics.hasLyrics) {
-            if (currentLyricIndex >= 0) {
-                displayedLyric = (Lyrics.lyrics[currentLyricIndex] ?? "").replace(/\u00A0/g, " ");
-                previousLyricText = currentLyricIndex > 0 ? (Lyrics.lyrics[currentLyricIndex - 1] ?? "").replace(/\u00A0/g, " ") : "";
-                nextLyricText = currentLyricIndex < Lyrics.lyrics.length - 1 ? (Lyrics.lyrics[currentLyricIndex + 1] ?? "").replace(/\u00A0/g, " ") : "";
-            } else {
-                displayedLyric = "";
-                previousLyricText = "";
-                nextLyricText = (Lyrics.lyrics[0] ?? "").replace(/\u00A0/g, " ");
-            }
-            lyricSlide.running = true;
-        } else {
-            displayedLyric = "";
-            previousLyricText = "";
-            nextLyricText = "";
-        }
-    }
-
-    Component.onCompleted: {
-        root.reloadTrack();
-    }
+    Component.onCompleted: Qt.callLater(root.updateLyrics)
 
     implicitWidth: 350 * root.lyricsScale
     implicitHeight: 180 * root.lyricsScale
@@ -212,39 +160,45 @@ Item {
 
     Timer {
         running: Players.active?.isPlaying ?? false
-        interval: GlobalConfig.dashboard.mediaUpdateInterval
+        interval: Config.dashboard.mediaUpdateInterval
         triggeredOnStart: true
         repeat: true
-        onTriggered: {
-            if (!Players.active)
-                return;
-            currentLyricIndex = Lyrics.indexForTime(Players.active.position);
-            Players.active?.positionChanged();
-        }
+        onTriggered: root.updateLyrics()
     }
 
     Connections {
-        function onActiveChanged() {
-            root.reloadTrack();
+        function onActiveChanged(): void {
+            Qt.callLater(root.updateLyrics);
         }
 
         target: Players
     }
 
     Connections {
-        function onPostTrackChanged() {
-            root.reloadTrack();
+        function onPositionChanged(): void {
+            root.updateLyrics();
         }
 
-        ignoreUnknownSignals: true
+        function onIsPlayingChanged(): void {
+            root.updateLyrics();
+        }
 
         target: Players.active
     }
 
     Connections {
-        function onHasLyricsChanged() {
-            root.hasLyrics = Lyrics.hasLyrics;
-            root.forceUpdate();
+        // setLines emits lyricsChanged before updating hasLyrics; coalesce both
+        // notifications so replacement content is read after the native update.
+        function onLyricsChanged(): void {
+            Qt.callLater(root.updateLyrics);
+        }
+
+        function onHasLyricsChanged(): void {
+            Qt.callLater(root.updateLyrics);
+        }
+
+        function onOffsetChanged(): void {
+            root.updateLyrics();
         }
 
         target: Lyrics
@@ -254,7 +208,7 @@ Item {
         id: lyricsContainer
 
         anchors.fill: parent
-        // Removed clip: true from here so the shadow doesn't get cut off
+
 
         layer.enabled: _cfg.shadowEnabled
         layer.effect: MultiEffect {
@@ -326,11 +280,9 @@ Item {
                 }
 
                 StyledText {
-                    text: qsTr("Loading lyrics...")
+                    text: Tr.tr("Loading lyrics...")
                     color: root.safeSecondary
-                    font.pointSize: Tokens.font.title.medium.pointSize * root.lyricsScale
-                    font.family: Tokens.font.title.medium.family
-                    font.weight: Tokens.font.title.medium.weight
+                    font: Tokens.font.title.builders.medium.scale(root.lyricsScale).build()
                 }
             }
 
@@ -341,7 +293,7 @@ Item {
             }
         }
 
-        // --- NEW INNER CONTAINER FOR FADE MASK ---
+
         Item {
             id: fadeContainer
 
@@ -405,8 +357,7 @@ Item {
 
                     anchors.fill: parent
                     text: root.previousLyricText
-                    font.family: root.sansFont
-                    font.pointSize: Tokens.font.body.medium.pointSize * root.lyricsScale
+                    font: Tokens.font.body.builders.medium.scale(root.lyricsScale).build()
                     color: root.safeSecondary
                     opacity: 0.6
                     wrapMode: Text.WordWrap
@@ -459,9 +410,7 @@ Item {
 
                     width: parent.width
                     text: root.displayedLyric
-                    font.family: root.sansFont
-                    font.pointSize: Tokens.font.title.medium.pointSize * 1.3 * root.lyricsScale
-                    font.weight: Font.Bold
+                    font: Tokens.font.title.builders.medium.scale(1.3 * root.lyricsScale).weight(Font.Bold).build()
                     color: Colours.palette.m3primary
                     wrapMode: Text.WordWrap
                     horizontalAlignment: {
@@ -497,8 +446,7 @@ Item {
 
                     anchors.fill: parent
                     text: root.nextLyricText
-                    font.family: root.sansFont
-                    font.pointSize: Tokens.font.body.medium.pointSize * root.lyricsScale
+                    font: Tokens.font.body.builders.medium.scale(root.lyricsScale).build()
                     color: root.safeSecondary
                     opacity: 0.6
                     wrapMode: Text.WordWrap

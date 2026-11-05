@@ -2,67 +2,25 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Caelestia.Config
+import Caelestia.I18n
 import qs.components
 import qs.components.filedialog
-import qs.components.images
+import qs.components.widgets
 import qs.services
 import qs.utils
 
 Item {
     id: root
 
-    property string source: Wallpapers.current
-    property CachingImage current
     property bool completed
-    property string animDir: ""
-    property string prevSource: ""
-    property bool initDone: false
 
-    onSourceChanged: {
-        if (!initDone) return;
-        handleSourceChange();
-    }
-
-    Component.onCompleted: {
-        initDone = true;
-        if (source)
-            Qt.callLater(() => {
-                handleSourceChange();
-                completed = true;
-            });
-    }
-
-    function handleSourceChange() {
-        if (!source) {
-            current = null;
-            return;
-        }
-
-        animDir = "";
-        if (prevSource && source !== prevSource) {
-            var list = Wallpapers.list;
-            var prevIdx = -1, currIdx = -1;
-            for (var i = 0; i < list.length; i++) {
-                if (list[i].path === prevSource) prevIdx = i;
-                if (list[i].path === source) currIdx = i;
-            }
-            if (prevIdx >= 0 && currIdx >= 0 && list.length > 1) {
-                if ((prevIdx + 1) % list.length === currIdx)
-                    animDir = "left";
-                else if ((prevIdx - 1 + list.length) % list.length === currIdx)
-                    animDir = "right";
-            }
-        }
-        prevSource = source;
-
-        current = imgComp.createObject(this, { path: source });
-    }
+    Component.onCompleted: completed = true
 
     Loader {
         asynchronous: true
         anchors.fill: parent
 
-        active: root.completed && !root.source
+        active: root.completed && !impl.source
 
         sourceComponent: StyledRect {
             color: Colours.palette.m3surfaceContainer
@@ -82,7 +40,7 @@ Item {
                     spacing: Tokens.spacing.small
 
                     StyledText {
-                        text: qsTr("Wallpaper missing?")
+                        text: Tr.tr("Wallpaper missing?")
                         color: Colours.palette.m3onSurfaceVariant
                         font: Tokens.font.body.builders.large.size(28 * 2).weight(Font.Bold).build()
                     }
@@ -97,8 +55,8 @@ Item {
                         FileDialog {
                             id: dialog
 
-                            title: qsTr("Select a wallpaper")
-                            filterLabel: qsTr("Image files")
+                            title: Tr.tr("Select a wallpaper")
+                            filterLabel: Tr.tr("Image files")
                             filters: Images.validImageExtensions
                             onAccepted: path => Wallpapers.setWallpaper(path)
                         }
@@ -114,7 +72,7 @@ Item {
 
                             anchors.centerIn: parent
 
-                            text: qsTr("Set it now!")
+                            text: Tr.tr("Set it now!")
                             color: Colours.palette.m3onPrimary
                             font: Tokens.font.body.large
                         }
@@ -124,46 +82,9 @@ Item {
         }
     }
 
-    Component {
-        id: imgComp
+    WallpaperImpl {
+        id: impl
 
-        CachingImage {
-            id: img
-
-            anchors.fill: parent
-
-            x: root.animDir === "left" ? parent.width : (root.animDir === "right" ? -parent.width : 0)
-            opacity: 0
-
-            onStatusChanged: {
-                if (status === Image.Ready) {
-                    animX.start();
-                    animOpacity.start();
-                }
-            }
-
-            Anim on x {
-                id: animX
-
-                type: Anim.DefaultEffects
-                running: false
-                to: 0
-            }
-
-            Anim on opacity {
-                id: animOpacity
-
-                type: Anim.DefaultEffects
-                running: false
-                from: 0
-                to: 1
-            }
-
-            Timer {
-                running: root.current !== img && root.current?.status === Image.Ready
-                interval: Math.max(animX.duration, animOpacity.duration)
-                onTriggered: img.destroy()
-            }
-        }
+        anchors.fill: parent
     }
 }

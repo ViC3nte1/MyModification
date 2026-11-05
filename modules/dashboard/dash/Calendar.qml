@@ -5,6 +5,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import M3Shapes
 import Caelestia.Config
+import Caelestia.I18n
 import qs.components
 import qs.components.controls
 import qs.components.effects
@@ -13,23 +14,23 @@ import qs.services
 CustomMouseArea {
     id: root
 
-    required property DashboardState dashState
+    required property ScreenState screenState
 
-    property date currentDate: dashState.currentDate
+    property date currentDate: screenState.dashboardDate
     readonly property int currMonth: currentDate.getMonth()
     readonly property int currYear: currentDate.getFullYear()
-    readonly property int nonAnimCurrMonth: dashState.currentDate.getMonth()
-    readonly property int nonAnimCurrYear: dashState.currentDate.getFullYear()
+    readonly property int nonAnimCurrMonth: screenState.dashboardDate.getMonth()
+    readonly property int nonAnimCurrYear: screenState.dashboardDate.getFullYear()
 
-    readonly property int animDirection: dashState.currentDate > currentDate ? -1 : 1
+    readonly property int animDirection: screenState.dashboardDate > currentDate ? -1 : 1
     property real animTranslate
     property real animOpacity: 1
 
     function onWheel(event: WheelEvent): void {
         if (event.angleDelta.y > 0)
-            dashState.currentDate = new Date(nonAnimCurrYear, nonAnimCurrMonth - 1, 1);
+            screenState.dashboardDate = new Date(nonAnimCurrYear, nonAnimCurrMonth - 1, 1);
         else if (event.angleDelta.y < 0)
-            dashState.currentDate = new Date(nonAnimCurrYear, nonAnimCurrMonth + 1, 1);
+            screenState.dashboardDate = new Date(nonAnimCurrYear, nonAnimCurrMonth + 1, 1);
     }
 
     anchors.left: parent.left
@@ -37,7 +38,7 @@ CustomMouseArea {
     implicitHeight: inner.implicitHeight + inner.anchors.margins * 2
 
     acceptedButtons: Qt.MiddleButton
-    onClicked: root.dashState.currentDate = new Date()
+    onClicked: root.screenState.dashboardDate = new Date()
 
     Anim {
         id: trOutAnim
@@ -105,7 +106,7 @@ CustomMouseArea {
                 type: IconButton.Text
                 font: Tokens.font.icon.builders.small.weight(Font.Bold).build()
                 padding: Tokens.padding.small
-                onClicked: root.dashState.currentDate = new Date(root.nonAnimCurrYear, root.nonAnimCurrMonth - 1, 1)
+                onClicked: root.screenState.dashboardDate = new Date(root.nonAnimCurrYear, root.nonAnimCurrMonth - 1, 1)
             }
 
             Item {
@@ -122,7 +123,7 @@ CustomMouseArea {
                         const now = new Date();
                         return root.nonAnimCurrMonth === now.getMonth() && root.nonAnimCurrYear === now.getFullYear();
                     }
-                    onClicked: root.dashState.currentDate = new Date()
+                    onClicked: root.screenState.dashboardDate = new Date()
 
                     Behavior on radius {
                         Anim {
@@ -152,7 +153,7 @@ CustomMouseArea {
                 type: IconButton.Text
                 font: Tokens.font.icon.builders.small.weight(Font.Bold).build()
                 padding: Tokens.padding.small
-                onClicked: root.dashState.currentDate = new Date(root.nonAnimCurrYear, root.nonAnimCurrMonth + 1, 1)
+                onClicked: root.screenState.dashboardDate = new Date(root.nonAnimCurrYear, root.nonAnimCurrMonth + 1, 1)
             }
         }
 
@@ -190,7 +191,7 @@ CustomMouseArea {
                 anchors.fill: parent
 
                 spacing: 3
-                locale: Qt.locale()
+                locale: Tr.locale
 
                 delegate: Item {
                     id: dayItem

@@ -4,6 +4,8 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell.Wayland
 import Caelestia.Config
+import Caelestia.Multimedia
+import Caelestia.State
 import qs.components
 import qs.services
 
@@ -154,11 +156,10 @@ WlSessionLockSurface {
         }
     }
 
-    ScreencopyView {
+    Item {
         id: background
 
         anchors.fill: parent
-        captureSource: root.screen
         opacity: 0
 
         layer.enabled: true
@@ -168,6 +169,28 @@ WlSessionLockSurface {
             blur: 1
             blurMax: 64
             blurMultiplier: 1
+        }
+
+        Loader {
+            anchors.fill: parent
+            sourceComponent: Config.lock.useWallpaper ? wallpaperBackground : screencopyBackground
+        }
+    }
+
+    Component {
+        id: screencopyBackground
+
+        ScreencopyView {
+            captureSource: root.screen
+        }
+    }
+
+    Component {
+        id: wallpaperBackground
+
+        Visual {
+            source: Wallpapers.current
+            playing: PersistentState.wallpaperPlaying
         }
     }
 
@@ -181,6 +204,7 @@ WlSessionLockSurface {
         implicitWidth: size
         implicitHeight: size
 
+        visible: Config.lock.enabled
         rotation: 180
         scale: 0
 

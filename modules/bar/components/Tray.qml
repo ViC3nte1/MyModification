@@ -22,7 +22,10 @@ StyledRect {
     readonly property real nonAnimHeight: {
         if (!Config.bar.tray.compact)
             return layout.implicitHeight + padding * 2;
-        return (expanded ? expandIcon.implicitHeight + layout.implicitHeight + spacing : expandIcon.implicitHeight) + padding * 2;
+        const pad = (Config.bar.tray.background ? Tokens.padding.extraSmall : 0) + padding;
+        if (expanded)
+            return expandIcon.implicitHeight + layout.implicitHeight + spacing + pad;
+        return Math.max(Config.bar.tray.background ? width : 0, expandIcon.implicitHeight + pad);
     }
 
     clip: true
@@ -68,7 +71,7 @@ StyledRect {
             id: items
 
             model: ScriptModel {
-                values: SystemTray.items.values.filter(i => !GlobalConfig.bar.tray.hiddenIcons.includes(i.id))
+                values: SystemTray.items.values.filter(i => i.status !== Status.Passive && !GlobalConfig.bar.tray.hiddenIcons.includes(i.id))
             }
 
             TrayItem {}
@@ -102,6 +105,7 @@ StyledRect {
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: Config.bar.tray.background ? Tokens.padding.extraSmall : -Tokens.padding.extraSmall
                 text: "expand_less"
+                color: Colours.palette.m3onSurfaceVariant
                 fontStyle: Tokens.font.icon.large
                 rotation: root.expanded ? 180 : 0
 

@@ -5,6 +5,8 @@ import QtQuick.Layouts
 import Quickshell.Bluetooth
 import Caelestia.Components
 import Caelestia.Config
+import Caelestia.I18n
+import Caelestia.State
 import qs.components
 import qs.components.controls
 import qs.services
@@ -14,23 +16,20 @@ import qs.modules.bar.popouts as BarPopouts
 StyledRect {
     id: root
 
-    required property DrawerVisibilities visibilities
+    required property ScreenState screenState
     required property BarPopouts.Wrapper popouts
 
     readonly property var quickToggles: {
         const seenIds = new Set();
 
-        return Config.utilities.quickToggles.filter(item => {
-            if (!(item.enabled ?? true))
+        return Config.utilities.quickToggles.values.filter(item => {
+            if (!item.enabled || seenIds.has(item.id))
                 return false;
 
-            if (seenIds.has(item.id)) {
-                return false;
-            }
+            // TODO: hide wallpaper playing toggle if wallpaper is live
 
-            if (item.id === "vpn") {
-                return GlobalConfig.utilities.vpn.provider.some(p => typeof p === "object" ? (p.enabled === true) : false);
-            }
+            if (item.id === "vpn")
+                return GlobalConfig.utilities.vpn.selectedProvider.length > 0;
 
             seenIds.add(item.id);
             return true;
@@ -39,7 +38,6 @@ StyledRect {
     readonly property int splitIndex: Math.ceil(quickToggles.length / 2)
     readonly property bool needExtraRow: quickToggles.length > 6
 
-    Layout.fillWidth: true
     implicitHeight: layout.implicitHeight + Tokens.padding.extraLargeIncreased
 
     radius: Tokens.rounding.large
@@ -53,7 +51,7 @@ StyledRect {
         spacing: Tokens.spacing.medium
 
         StyledText {
-            text: qsTr("Quick Toggles")
+            text: Tr.tr("Quick toggles")
             font: Tokens.font.body.medium
         }
 
@@ -91,9 +89,9 @@ StyledRect {
                     roleValue: "bluetooth"
                     delegate: Toggle {
                         icon: "bluetooth"
-                        checked: Bluetooth.defaultAdapter?.enabled ?? false // qmllint disable unresolved-type
+                        checked: Bluetooth.defaultAdapter?.enabled ?? false
                         onClicked: {
-                            const adapter = Bluetooth.defaultAdapter; // qmllint disable unresolved-type
+                            const adapter = Bluetooth.defaultAdapter;
                             if (adapter)
                                 adapter.enabled = !adapter.enabled;
                         }
@@ -118,7 +116,7 @@ StyledRect {
                         inactiveOnColour: Colours.palette.m3onSurfaceVariant
                         isToggle: false
                         onClicked: {
-                            root.visibilities.utilities = false;
+                            root.screenState.utilities = false;
                             WindowFactory.create();
                         }
                     }
@@ -127,16 +125,24 @@ StyledRect {
                     roleValue: "gameMode"
                     delegate: Toggle {
                         icon: "gamepad"
-                        checked: GameMode.enabled
-                        onClicked: GameMode.enabled = !GameMode.enabled
+                        checked: RuntimeState.gameMode
+                        onClicked: RuntimeState.gameMode = !RuntimeState.gameMode
+                    }
+                }
+                DelegateChoice {
+                    roleValue: "wallpaperPlaying"
+                    delegate: Toggle {
+                        icon: "smart_display"
+                        checked: PersistentState.wallpaperPlaying
+                        onClicked: PersistentState.wallpaperPlaying = !PersistentState.wallpaperPlaying
                     }
                 }
                 DelegateChoice {
                     roleValue: "dnd"
                     delegate: Toggle {
                         icon: "notifications_off"
-                        checked: Notifs.dnd
-                        onClicked: Notifs.dnd = !Notifs.dnd
+                        checked: PersistentState.doNotDisturb
+                        onClicked: PersistentState.doNotDisturb = !PersistentState.doNotDisturb
                     }
                 }
                 DelegateChoice {
@@ -144,7 +150,7 @@ StyledRect {
                     delegate: Toggle {
                         icon: "vpn_key"
                         checked: VPN.connected && VPN.status.state !== "needs-auth" && VPN.status.state !== "error"
-                        enabled: !VPN.connecting
+                        enabled: !VPN.connecting && !VPN.disconnecting
                         isToggle: VPN.status.state !== "needs-auth" && VPN.status.state !== "error"
                         inactiveOnColour: Colours.palette.m3onSurfaceVariant
                         onClicked: VPN.toggle()

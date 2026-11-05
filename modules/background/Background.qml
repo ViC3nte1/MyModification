@@ -2,42 +2,17 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import Caelestia.Config
 import qs.components
 import qs.components.containers
 import qs.services
 
-Item {
-    visible: false
-
-    QtObject {
-        id: desktopLyricsCfg
-
-        property bool enabled: true
-        property string position: "middle-center"
-
-        Component.onCompleted: {
-            var xhr = new XMLHttpRequest();
-            xhr.open("GET", "file://" + Quickshell.env("HOME") + "/.config/caelestia/desktop-lyrics.json", false);
-            try {
-                xhr.send();
-                if (xhr.status === 200) {
-                    var data = JSON.parse(xhr.responseText);
-                    var cfg = data;
-                    if (cfg) {
-                        if (cfg.enabled !== undefined) enabled = cfg.enabled;
-                        if (cfg.position) position = cfg.position;
-                    }
-                }
-            } catch(e) {}
-        }
-    }
-
-    Variants {
+Variants {
     model: Screens.screens.filter(s => GlobalConfig.forScreen(s.name).background.enabled)
 
-        StyledWindow {
+    StyledWindow {
         id: win
 
         required property ShellScreen modelData
@@ -53,6 +28,33 @@ Item {
         anchors.bottom: true
         anchors.left: true
         anchors.right: true
+
+        FileView {
+            id: desktopLyricsSettings
+
+            property var settings: ({})
+
+            path: Quickshell.env("HOME") + "/.config/caelestia/desktop-lyrics.json"
+            printErrors: false
+            watchChanges: true
+            onFileChanged: reload()
+            onLoaded: {
+                try {
+                    const data = JSON.parse(text());
+                    settings = data && typeof data === "object" && !Array.isArray(data) ? data : {};
+                } catch (error) {
+                    settings = {};
+                    console.warn("Invalid desktop lyrics settings; using defaults");
+                }
+            }
+            onLoadFailed: settings = {}
+        }
+
+        ShellState.ComponentRef {
+            screen: win.screen
+            slot: "background"
+            component: win
+        }
 
         Item {
             id: behindClock
@@ -186,11 +188,11 @@ Item {
             id: lyricsLoader
 
             asynchronous: true
-            active: desktopLyricsCfg.enabled
+            active: desktopLyricsSettings.settings.enabled ?? true
 
-            anchors.margins: Tokens.padding.large * 2
-            anchors.leftMargin: Tokens.padding.large * 2 + Tokens.sizes.bar.innerWidth + Math.max(Tokens.padding.small, Config.border.thickness)
-            state: desktopLyricsCfg.position
+            anchors.margins: Tokens.padding.extraLargeIncreased
+            anchors.leftMargin: Tokens.padding.extraLargeIncreased + Tokens.sizes.bar.innerWidth + Math.max(Tokens.padding.small, Config.border.thickness)
+            state: desktopLyricsSettings.settings.position ?? "middle-center"
             states: [
                 State {
                     name: "top-left"
@@ -292,12 +294,12 @@ Item {
             }
 
             sourceComponent: DesktopLyrics {
-                screen: modelData
+                screen: win.modelData
+                settings: desktopLyricsSettings.settings
                 wallpaper: behindClock
                 absX: lyricsLoader.x
                 absY: lyricsLoader.y
             }
         }
     }
-}
 }
