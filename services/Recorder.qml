@@ -52,14 +52,16 @@ Singleton {
             const running = code === 0;
 
             if (running && root.needsStop) {
-                commandProc.exec(["caelestia", "record"]);
+                // Redirect output: gpu-screen-recorder inherits the CLI's stdout, and
+                // closing this Process' pipe would kill it with SIGPIPE mid-recording.
+                commandProc.exec(["sh", "-c", "caelestia record >/dev/null 2>&1"]);
                 props.running = false;
                 props.paused = false;
             } else if (running && root.needsPause) {
-                commandProc.exec(["caelestia", "record", "-p"]);
+                commandProc.exec(["sh", "-c", "caelestia record -p >/dev/null 2>&1"]);
                 props.paused = !props.paused;
             } else if (!running && root.needsStart) {
-                commandProc.exec(["caelestia", "record", ...root.startArgs]);
+                commandProc.exec(["sh", "-c", `caelestia record ${root.startArgs.join(" ")} >/dev/null 2>&1`]);
                 props.running = true;
                 props.paused = false;
                 props.elapsed = 0;
